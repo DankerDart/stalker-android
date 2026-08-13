@@ -17,18 +17,25 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Unpack Split ZIP with 7z
+    - name: Hard Unpack All Files
       run: |
-        # Используем 7z, указывая на главную часть .zip
-        # Она автоматически найдет файл .z01, если он лежит рядом
-        7z x "xray-16-android-bundle (1).zip" -oextracted_project -y
+        # Принудительно распаковываем абсолютно всё, что найдем в репозитории
+        # 7z сам разберется со сплит-архивом, если указать правильную маску
+        7z x "*.zip" -oextracted_project -y || true
+        7z x "*.z01" -oextracted_project -y || true
         
-        # Находим папки с проектом
-        SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \;)
+        # Проверяем, где на самом деле появились файлы, и выводим структуру в лог
+        echo "=== Проверка содержимого папки ==="
+        ls -la extracted_project/ || true
+        
+        # Задаем базовые пути. Если find ничего не найдет, используем корень распаковки
+        SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \; | head -n 1)
+        if [ -z "$SETTINGS_DIR" ]; then SETTINGS_DIR="extracted_project"; fi
         echo "PROJECT_ROOT=$SETTINGS_DIR" >> $GITHUB_ENV
         
-        GRADLEW_PATH=$(find extracted_project -name "gradlew")
-        echo "GRADLEW_DIR=$(dirname $GRADLEW_PATH)" >> $GITHUB_ENV
+        GRADLEW_PATH=$(find extracted_project -name "gradlew" | head -n 1)
+        if [ -z "$GRADLEW_PATH" ]; then GRADLEW_DIR="extracted_project"; else GRADLEW_DIR=$(dirname $GRADLEW_PATH); fi
+        echo "GRADLEW_DIR=$GRADLEW_DIR" >> $GITHUB_ENV
 
     - name: Setup Android NDK
       uses: android-actions/setup-android@v3
@@ -40,12 +47,18 @@ jobs:
     - name: Build Engine APK
       run: |
         cd ${{ env.GRADLEW_DIR }}
-        chmod +x gradlew
-        ./gradlew assembleDebug
+        # На случай, если gradlew не нашелся, создаем обертку для запуска сборки
+        if [ ! -f "gradlew" ]; then
+          echo "=== Предупреждение: gradlew не найден в $PWD, пробуем запустить gradle напрямую ==="
+          gradle assembleDebug
+        else
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        fi
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: stalker-xray-apk
         path: |
-          ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
+          **/build/outputs/apk/debug/*.apk
