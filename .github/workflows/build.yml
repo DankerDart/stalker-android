@@ -11,7 +11,45 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Look At Github Files
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Unpack Multi-part ZIP
       run: |
-        echo "=== СМОТРИМ ЧТО ЛЕЖИТ В РЕПОЗИТОРИИ ==="
-        ls -la
+        # Переименовываем файлы, чтобы убрать пробелы и скобки, которые ломают команды Linux
+        mv "xray-16-android-bundle (1).z01" "xray.z01"
+        mv "xray-16-android-bundle (1).zip" "xray.zip"
+        
+        # Распаковываем архив через 7z. Он автоматически найдет xray.z01, если указать xray.zip
+        7z x xray.zip -oextracted_project -y
+        
+        # Находим папку, где лежит файл settings.gradle
+        SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \; | head -n 1)
+        echo "PROJECT_ROOT=$SETTINGS_DIR" >> $GITHUB_ENV
+        
+        # Находим папку, где лежит файл запуска gradlew
+        GRADLEW_PATH=$(find extracted_project -name "gradlew" | head -n 1)
+        echo "GRADLEW_DIR=$(dirname $GRADLEW_PATH)" >> $GITHUB_ENV
+
+    - name: Setup Android NDK
+      uses: android-actions/setup-android@v3
+
+    - name: Install NDK Component
+      run: |
+        sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+
+    - name: Build Engine APK
+      run: |
+        cd ${{ env.GRADLEW_DIR }}
+        chmod +x gradlew
+        ./gradlew assembleDebug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: stalker-xray-apk
+        path: |
+          ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
