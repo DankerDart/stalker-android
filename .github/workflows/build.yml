@@ -17,21 +17,11 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Rename and Merge Split ZIP
+    - name: Unpack Split ZIP with 7z
       run: |
-        # Переименовываем файлы под стандарт Linux, чтобы объединить их
-        mv "xray-16-android-bundle (1).z01" "xray-16-android-bundle (1).zip.001" 2>/dev/null || true
-        mv "xray-16-android-bundle (1).zip" "xray-16-android-bundle (1).zip.002" 2>/dev/null || true
-        
-        # Склеиваем две половинки в один полноценный ZIP-файл
-        cat "xray-16-android-bundle (1).zip.001" "xray-16-android-bundle (1).zip.002" > final_project.zip
-        
-        # Распаковываем получившийся архив
-        unzip final_project.zip -d extracted_project
-        
-        # Выводим список файлов для проверки в логах (чтобы мы видели, что всё на месте)
-        echo "=== Список распакованных файлов ==="
-        find extracted_project -maxdepth 3
+        # Используем 7z, указывая на главную часть .zip
+        # Она автоматически найдет файл .z01, если он лежит рядом
+        7z x "xray-16-android-bundle (1).zip" -oextracted_project -y
         
         # Находим папки с проектом
         SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \;)
