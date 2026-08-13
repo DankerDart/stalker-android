@@ -17,18 +17,18 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Combine and Unpack Split ZIP
+    - name: Combine and Unpack with 7z
       run: |
-        # Склеиваем многотомный ZIP-архив в один рабочий файл
-        # Для этого используем встроенную утилиту zip -s 0
-        zip -s 0 "xray-16-android-bundle (1).zip" --out full_project.zip
+        # Используем 7z для гарантированной склейки и распаковки многотомного ZIP
+        7z x "xray-16-android-bundle (1).zip" -oextracted_project -y
         
-        # Распаковываем получившийся целый архив
-        unzip full_project.zip -d extracted_project
-        
-        # Находим папку, где лежит файл настроек settings.gradle
+        # Находим точную папку, где лежит файл настроек settings.gradle
         SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \;)
         echo "PROJECT_ROOT=$SETTINGS_DIR" >> $GITHUB_ENV
+        
+        # Находим сам файл gradlew и выводим его путь для проверки в логах
+        GRADLEW_PATH=$(find extracted_project -name "gradlew")
+        echo "GRADLEW_DIR=$(dirname $GRADLEW_PATH)" >> $GITHUB_ENV
 
     - name: Setup Android NDK
       uses: android-actions/setup-android@v3
@@ -39,7 +39,7 @@ jobs:
 
     - name: Build Engine APK
       run: |
-        cd ${{ env.PROJECT_ROOT }}
+        cd ${{ env.GRADLEW_DIR }}
         chmod +x gradlew
         ./gradlew assembleDebug
 
