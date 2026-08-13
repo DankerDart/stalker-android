@@ -11,54 +11,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-
-    - name: Hard Unpack All Files
+    - name: Look At Github Files
       run: |
-        # Принудительно распаковываем абсолютно всё, что найдем в репозитории
-        # 7z сам разберется со сплит-архивом, если указать правильную маску
-        7z x "*.zip" -oextracted_project -y || true
-        7z x "*.z01" -oextracted_project -y || true
-        
-        # Проверяем, где на самом деле появились файлы, и выводим структуру в лог
-        echo "=== Проверка содержимого папки ==="
-        ls -la extracted_project/ || true
-        
-        # Задаем базовые пути. Если find ничего не найдет, используем корень распаковки
-        SETTINGS_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \; | head -n 1)
-        if [ -z "$SETTINGS_DIR" ]; then SETTINGS_DIR="extracted_project"; fi
-        echo "PROJECT_ROOT=$SETTINGS_DIR" >> $GITHUB_ENV
-        
-        GRADLEW_PATH=$(find extracted_project -name "gradlew" | head -n 1)
-        if [ -z "$GRADLEW_PATH" ]; then GRADLEW_DIR="extracted_project"; else GRADLEW_DIR=$(dirname $GRADLEW_PATH); fi
-        echo "GRADLEW_DIR=$GRADLEW_DIR" >> $GITHUB_ENV
-
-    - name: Setup Android NDK
-      uses: android-actions/setup-android@v3
-
-    - name: Install NDK Component
-      run: |
-        sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
-
-    - name: Build Engine APK
-      run: |
-        cd ${{ env.GRADLEW_DIR }}
-        # На случай, если gradlew не нашелся, создаем обертку для запуска сборки
-        if [ ! -f "gradlew" ]; then
-          echo "=== Предупреждение: gradlew не найден в $PWD, пробуем запустить gradle напрямую ==="
-          gradle assembleDebug
-        else
-          chmod +x gradlew
-          ./gradlew assembleDebug
-        fi
-
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: stalker-xray-apk
-        path: |
-          **/build/outputs/apk/debug/*.apk
+        echo "=== СМОТРИМ ЧТО ЛЕЖИТ В РЕПОЗИТОРИИ ==="
+        ls -la
