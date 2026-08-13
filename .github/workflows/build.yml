@@ -19,7 +19,7 @@ jobs:
 
     - name: Unpack Multi-part ZIP
       run: |
-        # Переименовываем и распаковываем файлы через 7z
+        # Распаковываем файлы через 7z
         mv "xray-16-android-bundle (1).z01" "xray.z01" 2>/dev/null || true
         mv "xray-16-android-bundle (1).zip" "xray.zip" 2>/dev/null || true
         7z x xray.zip -oextracted_project -y
@@ -29,19 +29,40 @@ jobs:
 
     - name: Install NDK Component
       run: |
-        # Устанавливаем NDK и CMake для сборки C++ движка
+        # Устанавливаем компиляторы для C++ движка Сталкера
         sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
 
-    - name: Build Engine APK
+    - name: Auto-Generate Gradle and Build
       run: |
-        # Заходим в папку с проектом, которую мы нашли в логах
         cd extracted_project/xray-16
         
-        # Создаем файлы локальных настроек, чтобы Gradle знал, где NDK
+        # 1. Принудительно создаем файл настроек settings.gradle
+        echo "include ':app'" > settings.gradle
+        
+        # 2. Автоматически создаем главный build.gradle, которого не хватало
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.2.0'
+            }
+        }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+EOF
+
+        # 3. Прописываем пути к Android SDK и NDK для компилятора
         echo "ndk.dir=$ANDROID_NDK_ROOT" > local.properties
         echo "sdk.dir=$ANDROID_HOME" >> local.properties
         
-        # Запускаем сборку напрямую через системный gradle
+        # 4. Запускаем сборку напрямую через системный gradle
         gradle assembleDebug
 
     - name: Upload APK Artifact
